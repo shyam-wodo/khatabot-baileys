@@ -1,0 +1,11 @@
+node_modules
+dist
+*.tsbuildinfo
+.env
+.env.*
+baileys_auth_info
+baileys_auth
+*.auth
+.DS_Store
+logs
+*.log
