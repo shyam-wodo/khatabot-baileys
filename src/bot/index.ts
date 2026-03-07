@@ -4,7 +4,7 @@
  * Connection lifecycle management
  */
 
-import { makeWASocket, DisconnectReason } from '@whiskeysockets/baileys';
+import { makeWASocket, DisconnectReason, Browsers } from '@whiskeysockets/baileys';
 import { useSupabaseAuthState } from './session-store.js';
 import { setupMessageListener } from './listener.js';
 import { createServerClient } from '@/lib/supabase/server.js';
@@ -53,7 +53,7 @@ export async function startBot(): Promise<void> {
       syncFullHistory: false,
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: false,
-      browser: ['KhataBot', 'Chrome', '120.0.0.0'],
+      browser: Browsers.ubuntu('Chrome'),
     });
 
     // Handle QR code
