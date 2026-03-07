@@ -20,7 +20,8 @@ const logger = pino({
 
 let socket: ReturnType<typeof makeWASocket> | null = null;
 let isShuttingDown = false;
-// Session start time tracked via DB created_at
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 /**
  * Initialize Baileys WhatsApp socket
@@ -86,7 +87,7 @@ export async function startBot(): Promise<void> {
             await db
               .from('bot_sessions')
               .update({
-                qr_code_png: pngBuffer,
+                qr_code_png: pngBuffer.toString('base64'),
                 qr_pending: true,
                 updated_at: new Date().toISOString(),
               })
@@ -111,6 +112,7 @@ export async function startBot(): Promise<void> {
         logger.info('Connecting to WhatsApp...');
       } else if (connection === 'open') {
         logger.info('Connected to WhatsApp successfully!');
+        reconnectAttempts = 0; // Reset on successful connection
 
         // Clear QR code and mark as connected
         try {
@@ -177,15 +179,33 @@ export async function startBot(): Promise<void> {
           await clearState();
         }
 
-        // Attempt reconnection
+        // Attempt reconnection with backoff and max retries
         if (shouldReconnect && !isShuttingDown) {
-          logger.info('Reconnecting in 5 seconds...');
+          reconnectAttempts++;
+          if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+            logger.error(
+              { attempts: reconnectAttempts },
+              'Max reconnect attempts reached. Clearing session and restarting with fresh QR.'
+            );
+            reconnectAttempts = 0;
+            await clearState();
+            // Clear QR state in DB
+            try {
+              const db = createServerClient() as any;
+              await db.from('bot_sessions').update({
+                qr_code_png: null,
+                qr_pending: false,
+              }).eq('session_id', process.env.BOT_SESSION_ID || 'khatabot-primary');
+            } catch {}
+          }
+          const delay = Math.min(5000 * reconnectAttempts, 30000);
+          logger.info({ attempt: reconnectAttempts, delayMs: delay }, 'Reconnecting...');
           setTimeout(() => {
             startBot().catch((err) => {
               logger.error(err, 'Failed to restart bot');
               process.exit(1);
             });
-          }, 5000);
+          }, delay);
         }
       }
     });
