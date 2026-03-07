@@ -50,8 +50,7 @@ export async function startBot(): Promise<void> {
     socket = makeWASocket({
       auth: state,
       logger,
-      printQRInTerminal: false, // Handle QR manually
-      syncFullHistory: false, // Don't sync full history on reconnect
+      syncFullHistory: false,
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: false,
       browser: ['KhataBot', 'Chrome', '120.0.0.0'],
@@ -169,8 +168,9 @@ export async function startBot(): Promise<void> {
           {
             statusCode: reason?.output?.statusCode,
             shouldReconnect,
+            error: reason?.message || reason?.output?.payload?.message || String(reason),
           },
-          `Connection closed: ${DisconnectReason[reason?.output?.statusCode]}`
+          `Connection closed: ${DisconnectReason[reason?.output?.statusCode] || 'unknown'}`
         );
 
         // Clear session if logged out explicitly
