@@ -46,10 +46,17 @@ export async function startBot(): Promise<void> {
       sessionId
     );
 
-    // Create Baileys socket
+    // Create Baileys socket with debug-level logger to capture errors
+    const baileysLogger = pino({
+      level: 'warn',
+      ...(process.env.NODE_ENV === 'development'
+        ? { transport: { target: 'pino-pretty', options: { colorize: true, singleLine: false } } }
+        : {}),
+    });
+
     socket = makeWASocket({
       auth: state,
-      logger,
+      logger: baileysLogger,
       syncFullHistory: false,
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: false,

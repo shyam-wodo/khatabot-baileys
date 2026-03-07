@@ -20,6 +20,13 @@ async function main(): Promise<void> {
   try {
     const { startBot, shutdownBot } = await import('./bot/index.js');
 
+    // Delay startup to let WhatsApp rate limits cool down after deploys
+    const startupDelay = parseInt(process.env.BOT_STARTUP_DELAY_MS || '0', 10);
+    if (startupDelay > 0) {
+      logger.info({ delayMs: startupDelay }, 'Waiting before connecting to WhatsApp...');
+      await new Promise(resolve => setTimeout(resolve, startupDelay));
+    }
+
     await startBot();
 
     const healthInterval = setInterval(() => {
