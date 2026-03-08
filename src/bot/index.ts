@@ -4,7 +4,7 @@
  * Connection lifecycle management
  */
 
-import { makeWASocket, DisconnectReason, Browsers } from '@whiskeysockets/baileys';
+import { makeWASocket, DisconnectReason, Browsers, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 import { useSupabaseAuthState } from './session-store.js';
 import { setupMessageListener } from './listener.js';
 import { createServerClient } from '@/lib/supabase/server.js';
@@ -46,6 +46,16 @@ export async function startBot(): Promise<void> {
       sessionId
     );
 
+    // Fetch latest WA web version to avoid 405 rejections from outdated bundled version
+    let waVersion: [number, number, number] | undefined;
+    try {
+      const { version } = await fetchLatestBaileysVersion();
+      waVersion = version;
+      logger.info({ version }, 'Fetched latest WA version');
+    } catch (versionErr) {
+      logger.warn('Failed to fetch latest WA version, using bundled default');
+    }
+
     // Create Baileys socket with debug-level logger to capture errors
     const baileysLogger = pino({
       level: 'warn',
@@ -61,6 +71,7 @@ export async function startBot(): Promise<void> {
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: false,
       browser: Browsers.ubuntu('Chrome'),
+      ...(waVersion ? { version: waVersion } : {}),
     });
 
     // Handle QR code
