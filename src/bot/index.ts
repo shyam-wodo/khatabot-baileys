@@ -70,7 +70,7 @@ export async function startBot(): Promise<void> {
       syncFullHistory: false,
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: false,
-      browser: Browsers.ubuntu('Chrome'),
+      browser: Browsers.macOS('Chrome'),
       ...(waVersion ? { version: waVersion } : {}),
     });
 
