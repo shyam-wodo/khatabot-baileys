@@ -7,6 +7,7 @@
 import pino from 'pino';
 import type { ClassifiedMessage } from '@/types/index.js';
 import { processMessage } from './message-flow.js';
+import { writeMessageLog } from './message-logger.js';
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
@@ -25,7 +26,8 @@ const logger = pino({
  */
 export async function routeMessage(
   message: ClassifiedMessage,
-  groupId: string
+  groupId: string,
+  groupName?: string
 ): Promise<void> {
   try {
     logger.debug(
@@ -50,11 +52,27 @@ export async function routeMessage(
             },
             'Message processing failed'
           );
+          await writeMessageLog({
+            group_name: groupName,
+            sender: message.sender_name,
+            message_type: message.message_type,
+            text_preview: message.text_content,
+            status: result.isDuplicate ? 'duplicate' : 'not_transaction',
+            skip_reason: result.error,
+          });
         } else {
           logger.info(
             { messageId: message.wa_message_id, transactionId: result.transactionId },
             'Message processed and saved'
           );
+          await writeMessageLog({
+            group_name: groupName,
+            sender: message.sender_name,
+            message_type: message.message_type,
+            text_preview: message.text_content,
+            status: 'saved',
+            transaction_id: result.transactionId,
+          });
         }
         break;
       }

@@ -9,6 +9,7 @@ import pino from 'pino';
 import type { proto, WASocket } from '@whiskeysockets/baileys';
 import { downloadMedia } from './media.js';
 import type { ClassifiedMessage, MessageType } from '@/types/index.js';
+import { writeMessageLog } from '@/services/message-logger.js';
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
@@ -129,7 +130,7 @@ export async function handleMessageEvent(
     const db = createServerClient() as any;
     const { data: group, error } = await db
       .from('groups')
-      .select('id')
+      .select('id, name')
       .eq('wa_group_jid', jid)
       .eq('is_active', true)
       .single();
@@ -139,6 +140,15 @@ export async function handleMessageEvent(
         { jid, messageId: event.key?.id },
         'Group not registered or inactive, skipping'
       );
+      // Log the skipped message so it shows up in the dashboard
+      await writeMessageLog({
+        group_name: jid,
+        sender: event.pushName || 'Unknown',
+        message_type: messageType,
+        text_preview: extractTextContent(event),
+        status: 'skipped',
+        skip_reason: 'group_inactive',
+      });
       return;
     }
 
@@ -185,7 +195,7 @@ export async function handleMessageEvent(
     const { routeMessage } = await import('@/services/message-router.js');
 
     // Route to message processing pipeline
-    await routeMessage(classifiedMessage, group.id);
+    await routeMessage(classifiedMessage, group.id, group.name);
 
     // Update bot session status
     await updateBotSessionStatus();
