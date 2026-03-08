@@ -5,9 +5,14 @@
  */
 
 import { makeWASocket, DisconnectReason, Browsers, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
+import { proto } from '@whiskeysockets/baileys/WAProto/index.js';
 import { useSupabaseAuthState } from './session-store.js';
 import { setupMessageListener } from './listener.js';
 import { createServerClient } from '@/lib/supabase/server.js';
+
+// Patch: WhatsApp rejects Platform.WEB (14) for new device pairing since Feb 2026.
+// Override to MACOS (24) which is accepted. See: https://github.com/WhiskeySockets/Baileys/pull/2377
+proto.ClientPayload.UserAgent.Platform.WEB = 24; // MACOS
 import pino from 'pino';
 import qrcode from 'qrcode';
 
