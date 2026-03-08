@@ -27,6 +27,7 @@ let socket: ReturnType<typeof makeWASocket> | null = null;
 let isShuttingDown = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Initialize Baileys WhatsApp socket
@@ -35,6 +36,10 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 export async function startBot(): Promise<void> {
   try {
     // Clean up previous socket listeners on reconnect
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    }
     if (socket) {
       socket.ev.removeAllListeners('connection.update');
       socket.ev.removeAllListeners('creds.update');
@@ -157,6 +162,22 @@ export async function startBot(): Promise<void> {
           logger.warn({ error: err }, 'Failed to clear QR code');
         }
 
+        // Start heartbeat: update last_heartbeat every 30s so dashboard knows bot is alive
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
+        const heartbeatSessionId = process.env.BOT_SESSION_ID || 'khatabot-primary';
+        const sendHeartbeat = async () => {
+          try {
+            const db = createServerClient() as any;
+            await db
+              .from('bot_sessions')
+              .update({ last_heartbeat: new Date().toISOString() })
+              .eq('session_id', heartbeatSessionId);
+          } catch {}
+        };
+        await sendHeartbeat(); // immediate on connect
+        heartbeatInterval = setInterval(sendHeartbeat, 30_000);
+        logger.info('Heartbeat started');
+
         // Auto-discover WhatsApp groups and upsert into DB
         try {
           if (socket) {
@@ -181,6 +202,12 @@ export async function startBot(): Promise<void> {
           logger.warn({ error: err }, 'Failed to discover WhatsApp groups');
         }
       } else if (connection === 'close') {
+        // Stop heartbeat on disconnect
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+          heartbeatInterval = null;
+        }
+
         // Check if disconnect was expected or due to auth error
         const reason = lastDisconnect?.error as any;
         const shouldReconnect = reason?.output?.statusCode !==
